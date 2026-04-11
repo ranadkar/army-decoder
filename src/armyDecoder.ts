@@ -43,13 +43,18 @@ export type DecodeResult = {
   spells: DecodedArmyItem[]
   totalHeroCount: number
   totalTroopCount: number
+  totalTroopHousingSpace: number
+  totalSiegeMachineCount: number
+  totalSiegeMachineHousingSpace: number
   totalSpellCount: number
+  totalSpellHousingSpace: number
   errors: string[]
 }
 
 type ParseSectionResult = {
   items: DecodedArmyItem[]
   totalCount: number
+  totalHousingSpace: number
   errors: string[]
 }
 
@@ -140,7 +145,11 @@ export function decodeArmyShareCode(value: string): DecodeResult {
       spells: [],
       totalHeroCount: 0,
       totalTroopCount: 0,
+      totalTroopHousingSpace: 0,
+      totalSiegeMachineCount: 0,
+      totalSiegeMachineHousingSpace: 0,
       totalSpellCount: 0,
+      totalSpellHousingSpace: 0,
       errors: [],
     }
   }
@@ -179,6 +188,8 @@ export function decodeArmyShareCode(value: string): DecodeResult {
   const heroes = heroSection.heroes
   const troops = [...troopSection.items, ...castleTroopSection.items]
   const spells = [...spellSection.items, ...castleSpellSection.items]
+  const troopTotals = calculateItemTotals(troops)
+  const spellTotals = calculateItemTotals(spells)
   const errors = [
     ...splitSections.errors,
     ...heroSection.errors,
@@ -199,7 +210,11 @@ export function decodeArmyShareCode(value: string): DecodeResult {
       spells,
       totalHeroCount: 0,
       totalTroopCount: 0,
+      totalTroopHousingSpace: 0,
+      totalSiegeMachineCount: 0,
+      totalSiegeMachineHousingSpace: 0,
       totalSpellCount: 0,
+      totalSpellHousingSpace: 0,
       errors: errors.length
         ? errors
         : [
@@ -217,8 +232,12 @@ export function decodeArmyShareCode(value: string): DecodeResult {
     troops,
     spells,
     totalHeroCount: heroes.length,
-    totalTroopCount: troopSection.totalCount + castleTroopSection.totalCount,
-    totalSpellCount: spellSection.totalCount + castleSpellSection.totalCount,
+    totalTroopCount: troopTotals.count,
+    totalTroopHousingSpace: troopTotals.housingSpace,
+    totalSiegeMachineCount: troopTotals.siegeMachineCount,
+    totalSiegeMachineHousingSpace: troopTotals.siegeMachineHousingSpace,
+    totalSpellCount: spellTotals.count,
+    totalSpellHousingSpace: spellTotals.housingSpace,
     errors,
   }
 }
@@ -283,6 +302,7 @@ function parseItemSections(
     return {
       items: [],
       totalCount: 0,
+      totalHousingSpace: 0,
       errors: [],
     }
   }
@@ -345,10 +365,15 @@ function parseItemSections(
 
   const items = [...mergedItems.values()]
   const totalCount = items.reduce((sum, item) => sum + item.count, 0)
+  const totalHousingSpace = items.reduce(
+    (sum, item) => sum + (item.housingSpace ?? 0) * item.count,
+    0,
+  )
 
   return {
     items,
     totalCount,
+    totalHousingSpace,
     errors,
   }
 }
@@ -446,4 +471,28 @@ function resolveHeroModeLabel(heroId: number, mode: number | null) {
 
 function isSectionToken(value: string): value is SectionToken {
   return SECTION_TOKENS.includes(value as SectionToken)
+}
+
+function calculateItemTotals(items: DecodedArmyItem[]) {
+  return items.reduce(
+    (totals, item) => {
+      const housingSpace = (item.housingSpace ?? 0) * item.count
+
+      if (item.kind === 'troop' && item.group === 'Siege Machine') {
+        totals.siegeMachineCount += item.count
+        totals.siegeMachineHousingSpace += housingSpace
+        return totals
+      }
+
+      totals.count += item.count
+      totals.housingSpace += housingSpace
+      return totals
+    },
+    {
+      count: 0,
+      housingSpace: 0,
+      siegeMachineCount: 0,
+      siegeMachineHousingSpace: 0,
+    },
+  )
 }

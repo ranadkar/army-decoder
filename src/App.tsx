@@ -31,6 +31,25 @@ function App() {
       0,
     )
   const hasResults = decodedArmy.status === 'ready'
+  const armyUnits = decodedArmy.troops.filter((item) => item.source === 'army')
+  const castleUnits = decodedArmy.troops.filter(
+    (item) => item.source === 'clan-castle',
+  )
+  const armyTroops = armyUnits.filter((item) => !isSiegeMachine(item))
+  const armySiegeMachines = armyUnits.filter(isSiegeMachine)
+  const castleTroops = castleUnits.filter((item) => !isSiegeMachine(item))
+  const castleSiegeMachines = castleUnits.filter(isSiegeMachine)
+  const armySpells = decodedArmy.spells.filter((item) => item.source === 'army')
+  const castleSpells = decodedArmy.spells.filter(
+    (item) => item.source === 'clan-castle',
+  )
+  const armyTroopTotals = getItemTotals(armyTroops)
+  const armySiegeTotals = getItemTotals(armySiegeMachines)
+  const armySpellTotals = getItemTotals(armySpells)
+  const hasClanCastle =
+    castleTroops.length > 0 ||
+    castleSiegeMachines.length > 0 ||
+    castleSpells.length > 0
 
   useEffect(() => {
     syncArmyCodeToLocation(armyCode)
@@ -79,12 +98,24 @@ function App() {
                     Heroes {decodedArmy.totalHeroCount}
                   </span>
                 ) : null}
-                <span className="meta-chip">
-                  Troops {decodedArmy.totalTroopCount}
-                </span>
-                <span className="meta-chip">
-                  Spells {decodedArmy.totalSpellCount}
-                </span>
+                {decodedArmy.totalTroopCount ? (
+                  <span className="meta-chip">
+                    Army {decodedArmy.totalTroopCount} •{' '}
+                    {decodedArmy.totalTroopHousingSpace} space
+                  </span>
+                ) : null}
+                {decodedArmy.totalSiegeMachineCount ? (
+                  <span className="meta-chip">
+                    Siege {decodedArmy.totalSiegeMachineCount} •{' '}
+                    {decodedArmy.totalSiegeMachineHousingSpace} space
+                  </span>
+                ) : null}
+                {decodedArmy.totalSpellCount ? (
+                  <span className="meta-chip">
+                    Spells {decodedArmy.totalSpellCount} •{' '}
+                    {decodedArmy.totalSpellHousingSpace} space
+                  </span>
+                ) : null}
                 <span className="meta-chip">Unknown {unknownEntryCount}</span>
               </div>
             ) : null}
@@ -168,23 +199,119 @@ function App() {
 
             <section className="results-grid">
               <ArmySection
-                title="Troops"
-                items={decodedArmy.troops}
-                totalCount={decodedArmy.totalTroopCount}
-                emptyLabel="No troop entries."
+                troops={armyTroops}
+                siegeMachines={armySiegeMachines}
+                troopSummary={formatSectionSummary(armyTroopTotals)}
+                siegeSummary={formatSectionSummary(armySiegeTotals)}
               />
 
-              <ArmySection
+              <SpellSection
                 title="Spells"
-                items={decodedArmy.spells}
-                totalCount={decodedArmy.totalSpellCount}
+                items={armySpells}
+                summary={formatSectionSummary(armySpellTotals)}
                 emptyLabel="No spell entries."
               />
+
+              {hasClanCastle ? (
+                <ClanCastleSection
+                  troops={castleTroops}
+                  siegeMachines={castleSiegeMachines}
+                  spells={castleSpells}
+                />
+              ) : null}
             </section>
           </>
         ) : null}
       </div>
     </main>
+  )
+}
+
+function ClanCastleSection({
+  troops,
+  siegeMachines,
+  spells,
+}: {
+  troops: DecodedArmyItem[]
+  siegeMachines: DecodedArmyItem[]
+  spells: DecodedArmyItem[]
+}) {
+  const troopTotals = getItemTotals(troops)
+  const siegeTotals = getItemTotals(siegeMachines)
+  const spellTotals = getItemTotals(spells)
+  const summaryParts: string[] = []
+
+  if (troopTotals.count) {
+    summaryParts.push(`Troops ${formatSectionSummary(troopTotals)}`)
+  }
+
+  if (siegeTotals.count) {
+    summaryParts.push(`Siege ${formatSectionSummary(siegeTotals)}`)
+  }
+
+  if (spellTotals.count) {
+    summaryParts.push(`Spells ${formatSectionSummary(spellTotals)}`)
+  }
+
+  return (
+    <section className="surface-card army-section">
+      <header className="section-header">
+        <div className="section-heading">
+          <h2>Clan Castle</h2>
+        </div>
+        <span>{summaryParts.join(' • ')}</span>
+      </header>
+
+      <div className="castle-groups">
+        <div className="castle-group">
+          <p className="castle-group-label">Troops</p>
+          {troops.length ? (
+            <div className="unit-grid">
+              {troops.map((item) => (
+                <ArmyCard
+                  key={`${item.kind}-${item.source}-${item.id}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No troop entries.</div>
+          )}
+        </div>
+
+        <div className="castle-group">
+          <p className="castle-group-label">Siege Machines</p>
+          {siegeMachines.length ? (
+            <div className="unit-grid">
+              {siegeMachines.map((item) => (
+                <ArmyCard
+                  key={`${item.kind}-${item.source}-${item.id}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No siege machines.</div>
+          )}
+        </div>
+
+        <div className="castle-group">
+          <p className="castle-group-label">Spells</p>
+          {spells.length ? (
+            <div className="unit-grid">
+              {spells.map((item) => (
+                <ArmyCard
+                  key={`${item.kind}-${item.source}-${item.id}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No spell entries.</div>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -211,20 +338,94 @@ function HeroSection({ heroes }: { heroes: DecodedHeroLoadout[] }) {
 }
 
 type ArmySectionProps = {
+  troops: DecodedArmyItem[]
+  siegeMachines: DecodedArmyItem[]
+  troopSummary: string
+  siegeSummary: string
+}
+
+function ArmySection({
+  troops,
+  siegeMachines,
+  troopSummary,
+  siegeSummary,
+}: ArmySectionProps) {
+  const summaryParts: string[] = []
+
+  if (troops.length) {
+    summaryParts.push(`Troops ${troopSummary}`)
+  }
+
+  if (siegeMachines.length) {
+    summaryParts.push(`Siege ${siegeSummary}`)
+  }
+
+  return (
+    <section className="surface-card army-section">
+      <header className="section-header">
+        <div className="section-heading">
+          <h2>Army</h2>
+        </div>
+        <span>{summaryParts.join(' • ')}</span>
+      </header>
+
+      <div className="castle-groups">
+        <div className="castle-group">
+          <p className="castle-group-label">Troops</p>
+          {troops.length ? (
+            <div className="unit-grid">
+              {troops.map((item) => (
+                <ArmyCard
+                  key={`${item.kind}-${item.source}-${item.id}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No troop entries.</div>
+          )}
+        </div>
+
+        <div className="castle-group">
+          <p className="castle-group-label">Siege Machines</p>
+          {siegeMachines.length ? (
+            <div className="unit-grid">
+              {siegeMachines.map((item) => (
+                <ArmyCard
+                  key={`${item.kind}-${item.source}-${item.id}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No siege machines.</div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+type SpellSectionProps = {
   title: string
   items: DecodedArmyItem[]
-  totalCount: number
+  summary: string
   emptyLabel: string
 }
 
-function ArmySection({ title, items, totalCount, emptyLabel }: ArmySectionProps) {
+function SpellSection({
+  title,
+  items,
+  summary,
+  emptyLabel,
+}: SpellSectionProps) {
   return (
     <section className="surface-card army-section">
       <header className="section-header">
         <div className="section-heading">
           <h2>{title}</h2>
         </div>
-        <span>{totalCount}</span>
+        <span>{summary}</span>
       </header>
 
       {items.length ? (
@@ -281,14 +482,10 @@ function HeroCard({ heroLoadout }: { heroLoadout: DecodedHeroLoadout }) {
 }
 
 function ArmyCard({ item }: { item: DecodedArmyItem }) {
-  const metadata = [`ID ${item.id}`]
-
-  if (item.source === 'clan-castle') {
-    metadata.push('Clan Castle')
-  }
+  const suffixMetadata: string[] = []
 
   if (!item.known) {
-    metadata.push('Unknown')
+    suffixMetadata.push('Unknown')
   }
 
   return (
@@ -300,20 +497,39 @@ function ArmyCard({ item }: { item: DecodedArmyItem }) {
       <div className="unit-body">
         <div className="unit-title-row">
           <div className="unit-copy">
-            <div className="unit-name-line">
-              <strong className="unit-name">{item.name}</strong>
+            <strong className="unit-name">{item.name}</strong>
+            <div className="unit-subline">
+              <p className="unit-group">{item.group}</p>
               <span
                 className={`unit-meta-inline${item.known ? '' : ' unit-meta-inline-warning'}`}
               >
-                {metadata.join(' • ')}
+                <span className="unit-space-inline">
+                  <HousingSpaceIcon />
+                  <span>{item.housingSpace ?? '?'}</span>
+                </span>
+                {suffixMetadata.length ? ` • ${suffixMetadata.join(' • ')}` : ''}
               </span>
             </div>
-            <p className="unit-group">{item.group}</p>
           </div>
-          <span className="count-pill">x{item.count}</span>
+          <div className="unit-count-row">
+            <span className="count-pill">x{item.count}</span>
+          </div>
         </div>
       </div>
     </article>
+  )
+}
+
+function HousingSpaceIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="unit-space-icon"
+      viewBox="0 0 16 16"
+    >
+      <path d="M8 1.5 13.5 4v8L8 14.5 2.5 12V4L8 1.5Z" />
+      <path d="M8 1.5V7m5.5-3L8 7m-5.5-3L8 7" />
+    </svg>
   )
 }
 
@@ -332,6 +548,27 @@ function getMonogram(name: string) {
   }
 
   return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase()
+}
+
+function getItemTotals(items: DecodedArmyItem[]) {
+  return items.reduce(
+    (totals, item) => ({
+      count: totals.count + item.count,
+      housingSpace: totals.housingSpace + (item.housingSpace ?? 0) * item.count,
+    }),
+    {
+      count: 0,
+      housingSpace: 0,
+    },
+  )
+}
+
+function formatSectionSummary(totals: ReturnType<typeof getItemTotals>) {
+  return `${totals.count} • ${totals.housingSpace} space`
+}
+
+function isSiegeMachine(item: DecodedArmyItem) {
+  return item.kind === 'troop' && item.group === 'Siege Machine'
 }
 
 export default App
