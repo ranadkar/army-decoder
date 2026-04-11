@@ -41,20 +41,15 @@ export type DecodeResult = {
   heroes: DecodedHeroLoadout[]
   troops: DecodedArmyItem[]
   spells: DecodedArmyItem[]
-  totalHeroCount: number
-  totalTroopCount: number
   totalTroopHousingSpace: number
   totalSiegeMachineCount: number
   totalSiegeMachineHousingSpace: number
-  totalSpellCount: number
   totalSpellHousingSpace: number
   errors: string[]
 }
 
 type ParseSectionResult = {
   items: DecodedArmyItem[]
-  totalCount: number
-  totalHousingSpace: number
   errors: string[]
 }
 
@@ -94,21 +89,6 @@ export function readArmyCodeFromLocation() {
   return normalizeArmyCode(params.get(ARMY_QUERY_PARAM) ?? '')
 }
 
-export function buildShareUrl(armyCode: string) {
-  if (typeof window === 'undefined') {
-    return ''
-  }
-
-  const normalizedCode = normalizeArmyCode(armyCode)
-  if (!normalizedCode) {
-    return ''
-  }
-
-  const url = new URL(window.location.href)
-  url.searchParams.set(ARMY_QUERY_PARAM, normalizedCode)
-  return url.toString()
-}
-
 export function syncArmyCodeToLocation(armyCode: string) {
   if (typeof window === 'undefined') {
     return
@@ -143,12 +123,9 @@ export function decodeArmyShareCode(value: string): DecodeResult {
       heroes: [],
       troops: [],
       spells: [],
-      totalHeroCount: 0,
-      totalTroopCount: 0,
       totalTroopHousingSpace: 0,
       totalSiegeMachineCount: 0,
       totalSiegeMachineHousingSpace: 0,
-      totalSpellCount: 0,
       totalSpellHousingSpace: 0,
       errors: [],
     }
@@ -208,19 +185,16 @@ export function decodeArmyShareCode(value: string): DecodeResult {
       heroes: [],
       troops,
       spells,
-      totalHeroCount: 0,
-      totalTroopCount: 0,
       totalTroopHousingSpace: 0,
       totalSiegeMachineCount: 0,
       totalSiegeMachineHousingSpace: 0,
-      totalSpellCount: 0,
       totalSpellHousingSpace: 0,
       errors: errors.length
         ? errors
         : [
-            'Expected a share code shaped like u10x0-2x3s1x9-3x2 or h...u...s....',
-            `Received: ${normalizedCode}`,
-          ],
+          'Expected a share code shaped like u10x0-2x3s1x9-3x2 or h...u...s....',
+          `Received: ${normalizedCode}`,
+        ],
     }
   }
 
@@ -231,12 +205,9 @@ export function decodeArmyShareCode(value: string): DecodeResult {
     heroes,
     troops,
     spells,
-    totalHeroCount: heroes.length,
-    totalTroopCount: troopTotals.count,
     totalTroopHousingSpace: troopTotals.housingSpace,
     totalSiegeMachineCount: troopTotals.siegeMachineCount,
     totalSiegeMachineHousingSpace: troopTotals.siegeMachineHousingSpace,
-    totalSpellCount: spellTotals.count,
     totalSpellHousingSpace: spellTotals.housingSpace,
     errors,
   }
@@ -301,8 +272,6 @@ function parseItemSections(
   if (!encodedSections.length) {
     return {
       items: [],
-      totalCount: 0,
-      totalHousingSpace: 0,
       errors: [],
     }
   }
@@ -344,36 +313,29 @@ function parseItemSections(
         itemKey,
         knownEntry
           ? {
-              ...knownEntry,
-              group: groupOverride ?? knownEntry.group,
-              count,
-              known: true,
-              source,
-            }
+            ...knownEntry,
+            group: groupOverride ?? knownEntry.group,
+            count,
+            known: true,
+            source,
+          }
           : {
-              id,
-              name: `Unknown ${label} #${id}`,
-              kind,
-              group: groupOverride ?? 'Unknown ID',
-              count,
-              known: false,
-              source,
-            },
+            id,
+            name: `Unknown ${label} #${id}`,
+            kind,
+            group: groupOverride ?? 'Unknown ID',
+            count,
+            known: false,
+            source,
+          },
       )
     }
   }
 
   const items = [...mergedItems.values()]
-  const totalCount = items.reduce((sum, item) => sum + item.count, 0)
-  const totalHousingSpace = items.reduce(
-    (sum, item) => sum + (item.housingSpace ?? 0) * item.count,
-    0,
-  )
 
   return {
     items,
-    totalCount,
-    totalHousingSpace,
     errors,
   }
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import {
-  buildShareUrl,
   decodeArmyShareCode,
   readArmyCodeFromLocation,
   syncArmyCodeToLocation,
@@ -10,26 +9,16 @@ import {
 } from './armyDecoder'
 
 const EXAMPLE_ARMY_CODE = 'u10x0-2x3s1x9-3x2'
+const USE_IN_GAME_BASE_URL =
+  'https://link.clashofclans.com/en/?action=CopyArmy&army='
 
 function App() {
   const [armyCode, setArmyCode] = useState(() => readArmyCodeFromLocation())
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
-    'idle',
-  )
 
   const decodedArmy = decodeArmyShareCode(armyCode)
-  const shareUrl = buildShareUrl(armyCode)
-  const unknownEntryCount =
-    decodedArmy.troops.filter((item) => !item.known).length +
-    decodedArmy.spells.filter((item) => !item.known).length +
-    decodedArmy.heroes.reduce(
-      (sum, heroLoadout) =>
-        sum +
-        Number(!heroLoadout.hero.known) +
-        Number(heroLoadout.pet !== null && !heroLoadout.pet.known) +
-        heroLoadout.equipment.filter((item) => !item.known).length,
-      0,
-    )
+  const useInGameUrl = decodedArmy.normalizedCode
+    ? `${USE_IN_GAME_BASE_URL}${encodeURIComponent(decodedArmy.normalizedCode)}`
+    : ''
   const hasResults = decodedArmy.status === 'ready'
   const armyUnits = decodedArmy.troops.filter((item) => item.source === 'army')
   const castleUnits = decodedArmy.troops.filter(
@@ -55,33 +44,6 @@ function App() {
     syncArmyCodeToLocation(armyCode)
   }, [armyCode])
 
-  useEffect(() => {
-    if (copyState === 'idle') {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setCopyState('idle')
-    }, 1800)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [copyState])
-
-  const handleCopyShareUrl = async () => {
-    if (!shareUrl) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopyState('copied')
-    } catch {
-      setCopyState('failed')
-    }
-  }
-
   return (
     <main className="app-shell">
       <div className="page">
@@ -89,34 +51,33 @@ function App() {
           <div className="panel-header">
             <div className="panel-heading">
               <h1>Army Decoder</h1>
-              <p>Paste a share code or full Clash link.</p>
             </div>
             {hasResults ? (
               <div className="meta-list">
-                {decodedArmy.totalHeroCount ? (
-                  <span className="meta-chip">
-                    Heroes {decodedArmy.totalHeroCount}
+                {decodedArmy.totalTroopHousingSpace ? (
+                  <span className="meta-chip summary-chip">
+                    <SummaryHousingValue
+                      kind="troop"
+                      value={decodedArmy.totalTroopHousingSpace}
+                    />
                   </span>
                 ) : null}
-                {decodedArmy.totalTroopCount ? (
-                  <span className="meta-chip">
-                    Army {decodedArmy.totalTroopCount} •{' '}
-                    {decodedArmy.totalTroopHousingSpace} space
+                {decodedArmy.totalSiegeMachineHousingSpace ? (
+                  <span className="meta-chip summary-chip">
+                    <SummaryHousingValue
+                      kind="siege"
+                      value={decodedArmy.totalSiegeMachineHousingSpace}
+                    />
                   </span>
                 ) : null}
-                {decodedArmy.totalSiegeMachineCount ? (
-                  <span className="meta-chip">
-                    Siege {decodedArmy.totalSiegeMachineCount} •{' '}
-                    {decodedArmy.totalSiegeMachineHousingSpace} space
+                {decodedArmy.totalSpellHousingSpace ? (
+                  <span className="meta-chip summary-chip">
+                    <SummaryHousingValue
+                      kind="spell"
+                      value={decodedArmy.totalSpellHousingSpace}
+                    />
                   </span>
                 ) : null}
-                {decodedArmy.totalSpellCount ? (
-                  <span className="meta-chip">
-                    Spells {decodedArmy.totalSpellCount} •{' '}
-                    {decodedArmy.totalSpellHousingSpace} space
-                  </span>
-                ) : null}
-                <span className="meta-chip">Unknown {unknownEntryCount}</span>
               </div>
             ) : null}
           </div>
@@ -137,46 +98,24 @@ function App() {
 
           <div className="button-row">
             <button
-              className="primary-button"
-              type="button"
-              onClick={() => setArmyCode(EXAMPLE_ARMY_CODE)}
-            >
-              Example
-            </button>
-            <button
               className="secondary-button"
               type="button"
-              onClick={() => setArmyCode('')}
-              disabled={!decodedArmy.normalizedCode}
+              onClick={() => {
+                if (useInGameUrl) {
+                  window.open(useInGameUrl, '_blank', 'noopener,noreferrer')
+                }
+              }}
+              disabled={!useInGameUrl}
             >
-              Clear
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => void handleCopyShareUrl()}
-              disabled={!shareUrl}
-            >
-              {copyState === 'copied'
-                ? 'Copied'
-                : copyState === 'failed'
-                  ? 'Copy failed'
-                  : 'Copy URL'}
+              Use in game
             </button>
           </div>
-
-          {shareUrl ? (
-            <div className="share-block">
-              <span className="field-label">Share URL</span>
-              <code className="share-url">{shareUrl}</code>
-            </div>
-          ) : null}
         </section>
 
         {decodedArmy.status === 'empty' ? (
           <section className="surface-card info-card">
             <p className="empty-state">
-              Paste a <code>u...s...</code> or <code>h...u...s...</code> code.
+              Paste an army share code.
             </p>
           </section>
         ) : null}
@@ -201,14 +140,14 @@ function App() {
               <ArmySection
                 troops={armyTroops}
                 siegeMachines={armySiegeMachines}
-                troopSummary={formatSectionSummary(armyTroopTotals)}
-                siegeSummary={formatSectionSummary(armySiegeTotals)}
+                troopHousingSpace={armyTroopTotals.housingSpace}
+                siegeHousingSpace={armySiegeTotals.housingSpace}
               />
 
               <SpellSection
                 title="Spells"
                 items={armySpells}
-                summary={formatSectionSummary(armySpellTotals)}
+                housingSpace={armySpellTotals.housingSpace}
                 emptyLabel="No spell entries."
               />
 
@@ -239,18 +178,27 @@ function ClanCastleSection({
   const troopTotals = getItemTotals(troops)
   const siegeTotals = getItemTotals(siegeMachines)
   const spellTotals = getItemTotals(spells)
-  const summaryParts: string[] = []
+  const summaryItems: HousingSummaryItem[] = []
 
   if (troopTotals.count) {
-    summaryParts.push(`Troops ${formatSectionSummary(troopTotals)}`)
-  }
-
-  if (siegeTotals.count) {
-    summaryParts.push(`Siege ${formatSectionSummary(siegeTotals)}`)
+    summaryItems.push({
+      kind: 'troop',
+      value: troopTotals.housingSpace,
+    })
   }
 
   if (spellTotals.count) {
-    summaryParts.push(`Spells ${formatSectionSummary(spellTotals)}`)
+    summaryItems.push({
+      kind: 'spell',
+      value: spellTotals.housingSpace,
+    })
+  }
+
+  if (siegeTotals.count) {
+    summaryItems.push({
+      kind: 'siege',
+      value: siegeTotals.housingSpace,
+    })
   }
 
   return (
@@ -259,7 +207,7 @@ function ClanCastleSection({
         <div className="section-heading">
           <h2>Clan Castle</h2>
         </div>
-        <span>{summaryParts.join(' • ')}</span>
+        {summaryItems.length ? <SummaryList items={summaryItems} /> : null}
       </header>
 
       <div className="castle-groups">
@@ -280,22 +228,6 @@ function ClanCastleSection({
         </div>
 
         <div className="castle-group">
-          <p className="castle-group-label">Siege Machines</p>
-          {siegeMachines.length ? (
-            <div className="unit-grid">
-              {siegeMachines.map((item) => (
-                <ArmyCard
-                  key={`${item.kind}-${item.source}-${item.id}`}
-                  item={item}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">No siege machines.</div>
-          )}
-        </div>
-
-        <div className="castle-group">
           <p className="castle-group-label">Spells</p>
           {spells.length ? (
             <div className="unit-grid">
@@ -310,6 +242,22 @@ function ClanCastleSection({
             <div className="empty-state">No spell entries.</div>
           )}
         </div>
+
+        <div className="castle-group">
+          <p className="castle-group-label">Siege Machines</p>
+          {siegeMachines.length ? (
+            <div className="unit-grid">
+              {siegeMachines.map((item) => (
+                <ArmyCard
+                  key={`${item.kind}-${item.source}-${item.id}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No siege machines.</div>
+          )}
+        </div>
       </div>
     </section>
   )
@@ -322,7 +270,6 @@ function HeroSection({ heroes }: { heroes: DecodedHeroLoadout[] }) {
         <div className="section-heading">
           <h2>Heroes</h2>
         </div>
-        <span>{heroes.length}</span>
       </header>
 
       <div className="hero-grid">
@@ -340,24 +287,30 @@ function HeroSection({ heroes }: { heroes: DecodedHeroLoadout[] }) {
 type ArmySectionProps = {
   troops: DecodedArmyItem[]
   siegeMachines: DecodedArmyItem[]
-  troopSummary: string
-  siegeSummary: string
+  troopHousingSpace: number
+  siegeHousingSpace: number
 }
 
 function ArmySection({
   troops,
   siegeMachines,
-  troopSummary,
-  siegeSummary,
+  troopHousingSpace,
+  siegeHousingSpace,
 }: ArmySectionProps) {
-  const summaryParts: string[] = []
+  const summaryItems: HousingSummaryItem[] = []
 
   if (troops.length) {
-    summaryParts.push(`Troops ${troopSummary}`)
+    summaryItems.push({
+      kind: 'troop',
+      value: troopHousingSpace,
+    })
   }
 
   if (siegeMachines.length) {
-    summaryParts.push(`Siege ${siegeSummary}`)
+    summaryItems.push({
+      kind: 'siege',
+      value: siegeHousingSpace,
+    })
   }
 
   return (
@@ -366,7 +319,7 @@ function ArmySection({
         <div className="section-heading">
           <h2>Army</h2>
         </div>
-        <span>{summaryParts.join(' • ')}</span>
+        {summaryItems.length ? <SummaryList items={summaryItems} /> : null}
       </header>
 
       <div className="castle-groups">
@@ -409,14 +362,14 @@ function ArmySection({
 type SpellSectionProps = {
   title: string
   items: DecodedArmyItem[]
-  summary: string
+  housingSpace: number
   emptyLabel: string
 }
 
 function SpellSection({
   title,
   items,
-  summary,
+  housingSpace,
   emptyLabel,
 }: SpellSectionProps) {
   return (
@@ -425,7 +378,9 @@ function SpellSection({
         <div className="section-heading">
           <h2>{title}</h2>
         </div>
-        <span>{summary}</span>
+        {housingSpace ? (
+          <SummaryList items={[{ kind: 'spell', value: housingSpace }]} />
+        ) : null}
       </header>
 
       {items.length ? (
@@ -443,9 +398,10 @@ function SpellSection({
 
 function HeroCard({ heroLoadout }: { heroLoadout: DecodedHeroLoadout }) {
   const subtitle = heroLoadout.modeLabel ?? 'Hero'
+  const equipmentSlots = [heroLoadout.equipment[0] ?? null, heroLoadout.equipment[1] ?? null]
 
   return (
-    <article className="unit-card">
+    <article className="unit-card hero-card">
       <div className="unit-icon unit-icon-hero">
         {getMonogram(heroLoadout.hero.name)}
       </div>
@@ -457,32 +413,54 @@ function HeroCard({ heroLoadout }: { heroLoadout: DecodedHeroLoadout }) {
             <p className="unit-group">{subtitle}</p>
           </div>
         </div>
+      </div>
 
-        <div className="meta-row">
-          {heroLoadout.pet ? (
-            <span
-              className={`meta-pill${heroLoadout.pet.known ? '' : ' meta-pill-warning'}`}
-            >
-              Pet {heroLoadout.pet.name}
-            </span>
-          ) : null}
-
-          {heroLoadout.equipment.map((equipment, index) => (
-            <span
-              className={`meta-pill${equipment.known ? '' : ' meta-pill-warning'}`}
-              key={`${equipment.id}-${index}`}
-            >
-              {equipment.name}
-            </span>
-          ))}
-        </div>
+      <div className="hero-loadout-grid">
+        <HeroLoadoutSlot
+          label="Pet"
+          entry={heroLoadout.pet}
+          emptyLabel="None"
+        />
+        {equipmentSlots.map((equipment, index) => (
+          <HeroLoadoutSlot
+            key={index}
+            label={`Equipment ${index + 1}`}
+            entry={equipment}
+            emptyLabel="None"
+          />
+        ))}
       </div>
     </article>
   )
 }
 
+function HeroLoadoutSlot({
+  label,
+  entry,
+  emptyLabel,
+}: {
+  label: string
+  entry: DecodedHeroLoadout['pet'] | DecodedHeroLoadout['equipment'][number] | null
+  emptyLabel: string
+}) {
+  const slotClassName = `hero-slot-value${
+    entry ? '' : ' hero-slot-value-empty'
+  }${entry && !entry.known ? ' hero-slot-value-warning' : ''}`
+
+  return (
+    <div className="hero-slot">
+      <p className="hero-slot-label">{label}</p>
+      <div className={slotClassName}>{entry?.name ?? emptyLabel}</div>
+    </div>
+  )
+}
+
 function ArmyCard({ item }: { item: DecodedArmyItem }) {
   const suffixMetadata: string[] = []
+  const housingKind = getHousingKind(item)
+  const iconClassName = `unit-icon unit-icon-${item.kind}${
+    housingKind === 'siege' ? ' unit-icon-siege' : ''
+  }`
 
   if (!item.known) {
     suffixMetadata.push('Unknown')
@@ -490,7 +468,7 @@ function ArmyCard({ item }: { item: DecodedArmyItem }) {
 
   return (
     <article className="unit-card">
-      <div className={`unit-icon unit-icon-${item.kind}`}>
+      <div className={iconClassName}>
         {getMonogram(item.name)}
       </div>
 
@@ -504,7 +482,7 @@ function ArmyCard({ item }: { item: DecodedArmyItem }) {
                 className={`unit-meta-inline${item.known ? '' : ' unit-meta-inline-warning'}`}
               >
                 <span className="unit-space-inline">
-                  <HousingSpaceIcon />
+                  <HousingSpaceIcon kind={housingKind} />
                   <span>{item.housingSpace ?? '?'}</span>
                 </span>
                 {suffixMetadata.length ? ` • ${suffixMetadata.join(' • ')}` : ''}
@@ -520,15 +498,55 @@ function ArmyCard({ item }: { item: DecodedArmyItem }) {
   )
 }
 
-function HousingSpaceIcon() {
+type HousingIconKind = 'troop' | 'spell' | 'siege'
+type HousingSummaryItem = {
+  kind: HousingIconKind
+  value: number
+}
+
+function HousingSpaceIcon({ kind }: { kind: HousingIconKind }) {
+  if (kind === 'spell') {
+    return (
+      <svg
+        aria-hidden="true"
+        className={`unit-space-icon unit-space-icon-${kind}`}
+        viewBox="0 0 16 16"
+      >
+        <path d="M6.1 2.5h3.8" />
+        <path d="M7 2.5v2.2L5.3 6.4v4.2A2.5 2.5 0 0 0 7.8 13h.4a2.5 2.5 0 0 0 2.5-2.4V6.4L9 4.7V2.5" />
+        <path d="M5.3 8.8h5.4" />
+      </svg>
+    )
+  }
+
+  if (kind === 'siege') {
+    return (
+      <svg
+        aria-hidden="true"
+        className={`unit-space-icon unit-space-icon-${kind}`}
+        viewBox="0 0 16 16"
+      >
+        <circle cx="4.5" cy="11.5" r="2" />
+        <circle cx="11.5" cy="11.5" r="2" />
+        <path d="M4.5 11.5h7" />
+        <path d="M6.5 11.5 9.2 4.4l3 1.2" />
+        <path d="M8.1 7.5H12" />
+      </svg>
+    )
+  }
+
   return (
     <svg
       aria-hidden="true"
-      className="unit-space-icon"
+      className={`unit-space-icon unit-space-icon-${kind}`}
       viewBox="0 0 16 16"
     >
-      <path d="M8 1.5 13.5 4v8L8 14.5 2.5 12V4L8 1.5Z" />
-      <path d="M8 1.5V7m5.5-3L8 7m-5.5-3L8 7" />
+      <g transform="rotate(45 8 8)">
+        <path d="M8 1.8 9.8 4.1V9H6.2V4.1L8 1.8Z" />
+        <path d="M4.8 9h6.4" />
+        <path d="M8 9v3" />
+        <path d="M8 14.1 8.9 13.2 8 12.3 7.1 13.2 8 14.1Z" />
+      </g>
     </svg>
   )
 }
@@ -563,12 +581,41 @@ function getItemTotals(items: DecodedArmyItem[]) {
   )
 }
 
-function formatSectionSummary(totals: ReturnType<typeof getItemTotals>) {
-  return `${totals.count} • ${totals.housingSpace} space`
+function SummaryList({ items }: { items: HousingSummaryItem[] }) {
+  return (
+    <span className="summary-list">
+      {items.map((item) => (
+        <SummaryHousingValue key={item.kind} kind={item.kind} value={item.value} />
+      ))}
+    </span>
+  )
+}
+
+function SummaryHousingValue({
+  kind,
+  value,
+}: {
+  kind: HousingIconKind
+  value: number
+}) {
+  return (
+    <span className="summary-space-inline">
+      <HousingSpaceIcon kind={kind} />
+      <span>{value}</span>
+    </span>
+  )
 }
 
 function isSiegeMachine(item: DecodedArmyItem) {
   return item.kind === 'troop' && item.group === 'Siege Machine'
+}
+
+function getHousingKind(item: DecodedArmyItem): HousingIconKind {
+  if (item.kind === 'spell') {
+    return 'spell'
+  }
+
+  return isSiegeMachine(item) ? 'siege' : 'troop'
 }
 
 export default App
