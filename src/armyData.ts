@@ -50,6 +50,7 @@ const troopEntries: CatalogEntry[] = [
   { id: 57, name: 'Rocket Balloon', kind: 'troop', group: 'Super Troop', housingSpace: 8 },
   { id: 58, name: 'Ice Golem', kind: 'troop', group: 'Troop', housingSpace: 15 },
   { id: 59, name: 'Electro Dragon', kind: 'troop', group: 'Troop', housingSpace: 30 },
+  { id: 60, name: 'Golden Dragon', kind: 'troop', group: 'Event Troop', housingSpace: 5 },
   { id: 61, name: 'Skeleton Barrel', kind: 'troop', group: 'Event Troop', housingSpace: 5 },
   { id: 62, name: 'Stone Slammer', kind: 'troop', group: 'Siege Machine', housingSpace: 1 },
   { id: 63, name: 'Inferno Dragon', kind: 'troop', group: 'Troop', housingSpace: 15 },
@@ -99,6 +100,7 @@ const troopEntries: CatalogEntry[] = [
   { id: 165, name: 'The Disarmer', kind: 'troop', group: 'Event Troop', housingSpace: 60 },
   { id: 167, name: 'Meteor Golem', kind: 'troop', group: 'Troop', housingSpace: 40 },
   { id: 177, name: 'Meteor Golem', kind: 'troop', group: 'Troop', housingSpace: 40 },
+  { id: 188, name: 'Sky Wagon', kind: 'troop', group: 'Siege Machine', housingSpace: 1 },
 ]
 
 const spellEntries: CatalogEntry[] = [
@@ -191,6 +193,7 @@ const equipmentEntries: CatalogEntry[] = [
   { id: 53, name: 'Rocket Backpack', kind: 'equipment', group: 'Equipment' },
   { id: 56, name: 'Stun Blaster', kind: 'equipment', group: 'Equipment' },
   { id: 57, name: 'Flame Blower', kind: 'equipment', group: 'Equipment' },
+  { id: 59, name: 'Electro Fangs', kind: 'equipment', group: 'Equipment' },
 ]
 
 function createCatalog<T extends CatalogEntry>(entries: T[]) {
